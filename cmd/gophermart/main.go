@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	_ "github.com/blokhinnv/gophermart/internal/app"
 	"github.com/blokhinnv/gophermart/internal/app/server"
 	"github.com/blokhinnv/gophermart/internal/app/server/config"
 	"github.com/joho/godotenv"

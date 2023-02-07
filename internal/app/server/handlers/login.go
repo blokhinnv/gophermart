@@ -22,6 +22,7 @@ func (h *Login) Handler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), status)
 		return
 	}
+
 	user, err := h.db.FindUser(ctx, body.Login, body.Password)
 	if err != nil {
 		// если не нашли пользователя - не можем авторизоваться
@@ -43,11 +44,12 @@ func (h *Login) Handler(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	token, err := auth.GenerateJWTToken(body.Login, h.signingKey, h.expireDuration)
+	token := auth.GenerateJWTToken(user, h.signingKey, h.expireDuration)
+	tokenSign, err := token.SignedString(h.signingKey)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Authorization", fmt.Sprintf("Bearer: %v", token))
+	w.Header().Set("Authorization", fmt.Sprintf("Bearer: %v", tokenSign))
 	w.WriteHeader(http.StatusOK)
 }

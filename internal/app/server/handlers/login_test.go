@@ -24,6 +24,7 @@ type LoginTestSuite struct {
 func (suite *LoginTestSuite) makeRequest(body io.Reader) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodPost, "/api/user/login", body)
+	req.Header.Set("Content-Type", "application/json")
 	suite.handler.ServeHTTP(rr, req)
 	return rr
 

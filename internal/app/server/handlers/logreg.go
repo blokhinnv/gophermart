@@ -9,15 +9,14 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/blokhinnv/gophermart/internal/app/database"
-	"golang.org/x/exp/slices"
 )
 
-type LogRegRequestBody struct {
+type logRegRequestBody struct {
 	Login    string `json:"login"    valid:"required"`
 	Password string `json:"password" valid:"required"`
 }
 
-const LogRegBodyContentType = "application/json"
+const logRegBodyContentType = "application/json"
 
 type LogReg struct {
 	db             *database.DatabaseService
@@ -26,10 +25,9 @@ type LogReg struct {
 }
 
 // чтение тела запроса с проверкой корректности
-func (h *LogReg) ReadBody(r *http.Request) (*LogRegRequestBody, int, error) {
+func (h *LogReg) ReadBody(r *http.Request) (*logRegRequestBody, int, error) {
 	// проверим content-type
-	contentTypes := r.Header["Content-Type"]
-	if slices.Contains(contentTypes, LogRegBodyContentType) {
+	if r.Header.Get("Content-Type") != logRegBodyContentType {
 		return nil, http.StatusBadRequest, fmt.Errorf(
 			"%w: incorrect content type",
 			ErrIncorrectRequest,
@@ -43,7 +41,7 @@ func (h *LogReg) ReadBody(r *http.Request) (*LogRegRequestBody, int, error) {
 			ErrIncorrectRequest,
 		)
 	}
-	body := LogRegRequestBody{}
+	body := logRegRequestBody{}
 	if err = json.Unmarshal(bodyBytes, &body); err != nil {
 		return nil, http.StatusBadRequest, fmt.Errorf(
 			"%w: incorrent body (error while unmarshaling)",

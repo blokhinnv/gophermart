@@ -24,6 +24,7 @@ type RegisterTestSuite struct {
 func (suite *RegisterTestSuite) makeRequest(body io.Reader) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodPost, "/api/user/register", body)
+	req.Header.Set("Content-Type", "application/json")
 	suite.handler.ServeHTTP(rr, req)
 	return rr
 

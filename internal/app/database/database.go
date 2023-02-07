@@ -46,24 +46,28 @@ func (db *DatabaseService) GetConn() *pgxpool.Pool {
 	return db.conn
 }
 
-func (db *DatabaseService) AddUser(ctx context.Context, username, pwd string) error {
+func (db *DatabaseService) AddUser(
+	ctx context.Context,
+	username, pwd string,
+) (*models.User, error) {
 	log.Printf("Adding user %v...", username)
 	salt, err := auth.GenerateSalt()
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	pwdHash := auth.GenerateHash(pwd, salt)
-	_, err = db.conn.Exec(ctx, addUserSQL, username, pwdHash, salt)
+	var addedID int
+	err = db.conn.QueryRow(ctx, addUserSQL, username, pwdHash, salt).Scan(&addedID)
 	if err != nil {
 		var pgerr *pgconn.PgError
 		if errors.As(err, &pgerr) {
 			if pgerr.Code == pgerrcode.UniqueViolation {
-				return fmt.Errorf("%w: %v", ErrUserAlreadyExists, username)
+				return nil, fmt.Errorf("%w: %v", ErrUserAlreadyExists, username)
 			}
 		}
-		return err
+		return nil, err
 	}
-	return nil
+	return &models.User{ID: addedID, Username: username, HashedPassword: pwdHash, Salt: salt}, nil
 }
 
 func (db *DatabaseService) FindUser(
@@ -71,13 +75,72 @@ func (db *DatabaseService) FindUser(
 	username, pwd string,
 ) (*models.User, error) {
 	var storedHash, salt string
-	err := db.conn.QueryRow(ctx, selectUserByLoginSQL, username).Scan(&storedHash, &salt)
+	var id int
+	err := db.conn.QueryRow(ctx, selectUserByLoginSQL, username).Scan(&id, &storedHash, &salt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("%w: %v", ErrUserNotFound, username)
 		}
 		return nil, err
 	}
-	return &models.User{Username: username, HashedPassword: storedHash, Salt: salt}, nil
+	return &models.User{ID: id, Username: username, HashedPassword: storedHash, Salt: salt}, nil
 
+}
+
+func (db *DatabaseService) FindOrderByID(
+	ctx context.Context,
+	orderID string,
+) (*models.Order, error) {
+	order := models.Order{}
+	err := db.conn.QueryRow(ctx, selectOrderByIDSQL, orderID).
+		Scan(&order.ID, &order.UserID, &order.StatusID, &order.UploadedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &order, err
+}
+
+func (db *DatabaseService) AddOrder(
+	ctx context.Context,
+	orderID string,
+	userID int,
+) error {
+	log.Printf("Adding order orderID=%v userID=%v...", orderID, userID)
+	// пытаемся найти заказ в БД
+	order, err := db.FindOrderByID(ctx, orderID)
+	if err != nil {
+		// не нашли заказ - надо добавить
+		if errors.Is(err, pgx.ErrNoRows) {
+			_, err = db.conn.Exec(ctx, addOrderSQL, orderID, userID)
+			return err
+		}
+		// любая другая ошибка - плохо
+		return err
+	}
+	// удалось что-то найти
+	if order.UserID == userID {
+		return fmt.Errorf(
+			"%w: orderID=%v userID=%v",
+			ErrOrderAlreadyAddedByThisUser,
+			orderID,
+			userID,
+		)
+	} else {
+		return fmt.Errorf("%w: orderID=%v userID=%v", ErrOrderAlreadyAddedByOtherUser, orderID, userID)
+	}
+}
+
+func (db *DatabaseService) UpdateOrderStatus(ctx context.Context, orderID, newStatus string) error {
+	_, err := db.conn.Exec(ctx, updateOrderStatusSQL, newStatus, orderID)
+	return err
+}
+
+func (db *DatabaseService) AddAccrualRecord(
+	ctx context.Context,
+	orderID string,
+	sum float64,
+) error {
+	log.Printf("Adding accrual record orderID=%v sum=%v...", orderID, sum)
+	_, err := db.conn.Exec(ctx, addTransactionSQL, orderID, sum, "ACCRUAL")
+	return err
 }

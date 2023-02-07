@@ -2,23 +2,25 @@ package handlers
 
 import (
 	"bytes"
-	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/blokhinnv/gophermart/internal/app/auth"
 	"github.com/blokhinnv/gophermart/internal/app/database"
-	"github.com/blokhinnv/gophermart/internal/app/server/config"
+	"github.com/blokhinnv/gophermart/internal/app/models"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 )
 
 type RegisterTestSuite struct {
 	suite.Suite
-	db      *database.DatabaseService
-	reg     Register
+	db      *database.MockService
 	handler http.HandlerFunc
+	ctrl    *gomock.Controller
 }
 
 func (suite *RegisterTestSuite) makeRequest(body io.Reader) *httptest.ResponseRecorder {
@@ -26,42 +28,62 @@ func (suite *RegisterTestSuite) makeRequest(body io.Reader) *httptest.ResponseRe
 	req, _ := http.NewRequest(http.MethodPost, "/api/user/register", body)
 	req.Header.Set("Content-Type", "application/json")
 	suite.handler.ServeHTTP(rr, req)
+	fmt.Println(rr.Body.String())
 	return rr
 
 }
 
 func (suite *RegisterTestSuite) SetupSuite() {
-	db, _ := database.NewDatabaseService(
-		&config.Config{DatabaseURI: "postgres://root:pwd@localhost:5432/root"},
-		context.Background(),
-		true,
-	)
+	suite.ctrl = gomock.NewController(suite.T())
+	suite.db = database.NewMockService(suite.ctrl)
+
 	reg := Register{
 		LogReg: LogReg{
-			db:             db,
+			db:             suite.db,
 			signingKey:     []byte("qwerty"),
 			expireDuration: 1 * time.Hour,
 		},
 	}
-	suite.db = db
-	suite.reg = reg
-	suite.handler = http.HandlerFunc(suite.reg.Handler)
+	suite.handler = http.HandlerFunc(reg.Handler)
 }
 
-func (suite *RegisterTestSuite) TearDownTest() {
-	suite.db.GetConn().Exec(context.Background(), `DELETE FROM UserAccount;`)
+func (suite *RegisterTestSuite) TearDownSuite() {
+	suite.ctrl.Finish()
 }
 
 func (suite *RegisterTestSuite) TestSingle() {
 	jsonStr := []byte(`{"login":"nikita", "password": "123"}`)
+	suite.db.EXPECT().
+		AddUser(gomock.Any(), gomock.Eq("nikita"), gomock.Eq("123")).
+		Times(1).
+		Return(&models.User{
+			ID:             1,
+			Username:       "nikita",
+			HashedPassword: auth.GenerateHash("123", "456"),
+			Salt:           "456",
+		}, nil)
+
 	rr := suite.makeRequest(bytes.NewBuffer(jsonStr))
 	suite.Equal(http.StatusOK, rr.Code)
 }
 
 func (suite *RegisterTestSuite) TestAlreadyExisted() {
 	jsonStr := []byte(`{"login":"nikita", "password": "123"}`)
+	suite.db.EXPECT().
+		AddUser(gomock.Any(), gomock.Eq("nikita"), gomock.Eq("123")).
+		Times(1).
+		Return(&models.User{
+			ID:             1,
+			Username:       "nikita",
+			HashedPassword: auth.GenerateHash("123", "456"),
+			Salt:           "456",
+		}, nil)
 	resp1 := suite.makeRequest(bytes.NewBuffer(jsonStr))
 	suite.Equal(http.StatusOK, resp1.Code)
+	suite.db.EXPECT().
+		AddUser(gomock.Any(), gomock.Eq("nikita"), gomock.Eq("123")).
+		Times(1).
+		Return(nil, fmt.Errorf("%w: %v", database.ErrUserAlreadyExists, "nikita"))
 	resp2 := suite.makeRequest(bytes.NewBuffer(jsonStr))
 	suite.Equal(http.StatusConflict, resp2.Code)
 }

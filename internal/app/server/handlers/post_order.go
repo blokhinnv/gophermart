@@ -16,7 +16,7 @@ import (
 )
 
 type PostOrder struct {
-	db     *database.DatabaseService
+	db     database.Service
 	c      chan string
 	client *resty.Client
 }
@@ -34,7 +34,7 @@ type accrualSystemResponse struct {
 const orderContentType = "text/plain"
 
 func NewPostOrder(
-	db *database.DatabaseService,
+	db database.Service,
 	cSize, nWorkers int,
 	accrualSystemAddr string,
 ) *PostOrder {

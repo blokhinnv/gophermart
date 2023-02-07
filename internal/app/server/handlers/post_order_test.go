@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,8 +12,8 @@ import (
 	"github.com/blokhinnv/gophermart/internal/app/auth"
 	"github.com/blokhinnv/gophermart/internal/app/database"
 	"github.com/blokhinnv/gophermart/internal/app/models"
-	"github.com/blokhinnv/gophermart/internal/app/server/config"
 	"github.com/go-chi/jwtauth/v5"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -22,39 +21,30 @@ const AccrualSystemAddress = "http://localhost:8081"
 
 type PostOrderTestSuite struct {
 	suite.Suite
-	db        *database.DatabaseService
-	postOrder *PostOrder
+	db        *database.MockService
 	handler   http.Handler
 	tokenSign string
+	ctrl      *gomock.Controller
 }
 
 func (suite *PostOrderTestSuite) SetupSuite() {
-	db, _ := database.NewDatabaseService(
-		&config.Config{DatabaseURI: "postgres://root:pwd@localhost:5432/root"},
-		context.Background(),
-		true,
-	)
-	postOrder := NewPostOrder(db, 10, 2, AccrualSystemAddress)
-	suite.db = db
-	suite.postOrder = postOrder
+	suite.ctrl = gomock.NewController(suite.T())
+	suite.db = database.NewMockService(suite.ctrl)
 
-	user, pwd := "nikita", "123"
 	signingKey := []byte("qwerty")
-	suite.db.AddUser(context.Background(), user, pwd)
-
 	token := auth.GenerateJWTToken(
-		&models.User{ID: 1, Username: user},
+		&models.User{ID: 1, Username: "nikita"},
 		signingKey,
 		time.Hour,
 	)
-
 	tokenSign, _ := token.SignedString(signingKey)
 	suite.tokenSign = tokenSign
 	tokenAuth := jwtauth.New("HS256", signingKey, nil)
 
+	postOrder := NewPostOrder(suite.db, 10, 2, AccrualSystemAddress)
 	verifier := jwtauth.Verifier(tokenAuth)
 	authentifier := jwtauth.Authenticator
-	handler := http.HandlerFunc(suite.postOrder.Handler)
+	handler := http.HandlerFunc(postOrder.Handler)
 	suite.handler = verifier(authentifier(handler))
 
 }
@@ -77,9 +67,39 @@ func (suite *PostOrderTestSuite) TestNoAuth() {
 	suite.Equal(http.StatusUnauthorized, rr.Code)
 }
 
-func (suite *PostOrderTestSuite) TestOK() {
+func (suite *PostOrderTestSuite) TestAccepted() {
+	suite.db.EXPECT().
+		AddOrder(gomock.Any(), gomock.Eq("18"), gomock.Eq(1)).
+		Times(1).
+		Return(nil)
+
 	rr := suite.makeRequest(bytes.NewBuffer([]byte(`18`)), true)
 	suite.Equal(http.StatusAccepted, rr.Code)
+}
+
+func (suite *PostOrderTestSuite) TestAlreadyAddedByMe() {
+	suite.db.EXPECT().
+		AddOrder(gomock.Any(), gomock.Eq("18"), gomock.Eq(1)).
+		Times(1).
+		Return(fmt.Errorf(
+			"%w: orderID=%v userID=%v",
+			database.ErrOrderAlreadyAddedByThisUser,
+			"18",
+			1,
+		))
+
+	rr := suite.makeRequest(bytes.NewBuffer([]byte(`18`)), true)
+	suite.Equal(http.StatusOK, rr.Code)
+}
+
+func (suite *PostOrderTestSuite) TestAlreadyAddedNotByMe() {
+	suite.db.EXPECT().
+		AddOrder(gomock.Any(), gomock.Eq("18"), gomock.Eq(1)).
+		Times(1).
+		Return(fmt.Errorf("%w: orderID=%v userID=%v", database.ErrOrderAlreadyAddedByOtherUser, "18", 1))
+
+	rr := suite.makeRequest(bytes.NewBuffer([]byte(`18`)), true)
+	suite.Equal(http.StatusConflict, rr.Code)
 }
 
 func (suite *PostOrderTestSuite) TestBadRequest() {

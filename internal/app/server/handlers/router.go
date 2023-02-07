@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/jwtauth/v5"
 )
 
-func NewRouter(db *database.DatabaseService, cfg *config.Config) chi.Router {
+func NewRouter(db database.Service, cfg *config.Config) chi.Router {
 	r := chi.NewRouter()
 	reg := Register{
 		LogReg: LogReg{

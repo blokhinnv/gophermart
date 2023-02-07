@@ -19,7 +19,7 @@ type logRegRequestBody struct {
 const logRegBodyContentType = "application/json"
 
 type LogReg struct {
-	db             *database.DatabaseService
+	db             database.Service
 	signingKey     []byte
 	expireDuration time.Duration
 }

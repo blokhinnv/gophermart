@@ -83,3 +83,11 @@ JOIN OrderStatus s ON s.id = o.status_id
 WHERE o.user_id = $1
 ORDER BY o.uploaded_at;
 `
+const getBalanceSQL = `
+SELECT
+    SUM(CASE WHEN transaction_type_id=1 THEN t.sum END) - SUM(CASE WHEN transaction_type_id=2 THEN t.sum END) AS balance,
+    SUM(CASE WHEN transaction_type_id=2 THEN t.sum END) AS withdrawn
+FROM Transaction t
+JOIN UserOrder o ON o.id = t.order_id
+WHERE o.user_id = $1;
+`

@@ -14,4 +14,5 @@ type Service interface {
 	UpdateOrderStatus(ctx context.Context, orderID, newStatus string) error
 	AddAccrualRecord(ctx context.Context, orderID string, sum float64) error
 	FindOrdersByUserID(ctx context.Context, userID int) ([]models.Order, error)
+	GetBalance(ctx context.Context, userID int) (*models.Balance, error)
 }

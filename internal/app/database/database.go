@@ -170,3 +170,13 @@ func (db *DatabaseService) FindOrdersByUserID(
 	}
 	return orders, nil
 }
+
+func (db *DatabaseService) GetBalance(ctx context.Context, userID int) (*models.Balance, error) {
+	balance := models.Balance{}
+	err := db.conn.QueryRow(ctx, getBalanceSQL, userID).
+		Scan(&balance.Current, &balance.Withdrawn)
+	if err != nil {
+		return nil, err
+	}
+	return &balance, err
+}

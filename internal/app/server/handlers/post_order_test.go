@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blokhinnv/gophermart/internal/app/accrual"
 	"github.com/blokhinnv/gophermart/internal/app/auth"
 	"github.com/blokhinnv/gophermart/internal/app/database"
 	"github.com/blokhinnv/gophermart/internal/app/models"
@@ -17,14 +18,13 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const AccrualSystemAddress = "http://localhost:8081"
-
 type PostOrderTestSuite struct {
 	suite.Suite
-	db        *database.MockService
-	handler   http.Handler
-	tokenSign string
-	ctrl      *gomock.Controller
+	db             *database.MockService
+	handler        http.Handler
+	tokenSign      string
+	ctrl           *gomock.Controller
+	accrualService *accrual.MockService
 }
 
 func (suite *PostOrderTestSuite) SetupSuite() {
@@ -41,7 +41,16 @@ func (suite *PostOrderTestSuite) SetupSuite() {
 	suite.tokenSign = tokenSign
 	tokenAuth := jwtauth.New("HS256", signingKey, nil)
 
-	postOrder := NewPostOrder(suite.db, 10, 2, AccrualSystemAddress)
+	suite.accrualService = accrual.NewMockService(suite.ctrl)
+	suite.accrualService.EXPECT().
+		GetOrderInfo(gomock.Eq("18")).
+		Return([]byte(`{
+			"order": "18",
+			"status": "PROCESSED",
+			"accrual": 500
+		}`), nil)
+
+	postOrder := NewPostOrder(suite.db, 10, 2, suite.accrualService)
 	verifier := jwtauth.Verifier(tokenAuth)
 	authentifier := jwtauth.Authenticator
 	handler := http.HandlerFunc(postOrder.Handler)
@@ -72,7 +81,6 @@ func (suite *PostOrderTestSuite) TestAccepted() {
 		AddOrder(gomock.Any(), gomock.Eq("18"), gomock.Eq(1)).
 		Times(1).
 		Return(nil)
-
 	rr := suite.makeRequest(bytes.NewBuffer([]byte(`18`)), true)
 	suite.Equal(http.StatusAccepted, rr.Code)
 }
@@ -87,7 +95,6 @@ func (suite *PostOrderTestSuite) TestAlreadyAddedByMe() {
 			"18",
 			1,
 		))
-
 	rr := suite.makeRequest(bytes.NewBuffer([]byte(`18`)), true)
 	suite.Equal(http.StatusOK, rr.Code)
 }
@@ -97,7 +104,6 @@ func (suite *PostOrderTestSuite) TestAlreadyAddedNotByMe() {
 		AddOrder(gomock.Any(), gomock.Eq("18"), gomock.Eq(1)).
 		Times(1).
 		Return(fmt.Errorf("%w: orderID=%v userID=%v", database.ErrOrderAlreadyAddedByOtherUser, "18", 1))
-
 	rr := suite.makeRequest(bytes.NewBuffer([]byte(`18`)), true)
 	suite.Equal(http.StatusConflict, rr.Code)
 }

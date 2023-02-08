@@ -8,17 +8,18 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/asaskevich/govalidator"
+	"github.com/blokhinnv/gophermart/internal/app/accrual"
 	"github.com/blokhinnv/gophermart/internal/app/database"
 	"github.com/go-chi/jwtauth/v5"
-	"github.com/go-resty/resty/v2"
 )
 
 type PostOrder struct {
-	db     database.Service
-	c      chan string
-	client *resty.Client
+	db            database.Service
+	c             chan string
+	accrualSystem accrual.Service
 }
 
 type postOrderBody struct {
@@ -36,12 +37,13 @@ const orderContentType = "text/plain"
 func NewPostOrder(
 	db database.Service,
 	cSize, nWorkers int,
-	accrualSystemAddr string,
+	accrualSystem accrual.Service,
 ) *PostOrder {
-	client := resty.New()
-	client.SetBaseURL(fmt.Sprintf("%v/api/orders/", accrualSystemAddr))
-
-	o := PostOrder{db: db, c: make(chan string, cSize), client: client}
+	o := PostOrder{
+		db:            db,
+		c:             make(chan string, cSize),
+		accrualSystem: accrualSystem,
+	}
 	for i := 0; i < nWorkers; i++ {
 		go o.Loop()
 	}
@@ -80,13 +82,15 @@ func (h *PostOrder) Loop() {
 	for {
 		orderID := <-h.c
 		// делаем запрос к системе расчета баллов
-		res, err := h.client.R().Get(orderID)
+		res, err := h.accrualSystem.GetOrderInfo(orderID)
 		if err != nil {
 			log.Printf("Error while processing order %v: %v\n", orderID, err.Error())
 			continue
 		}
+		// TODO: remove after debug
+		time.Sleep(10 * time.Second)
 		resp := accrualSystemResponse{}
-		json.Unmarshal(res.Body(), &resp)
+		json.Unmarshal(res, &resp)
 		// обновить запись о заказе
 		h.db.UpdateOrderStatus(context.Background(), orderID, resp.Status)
 		// проверить готовность

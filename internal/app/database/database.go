@@ -144,3 +144,29 @@ func (db *DatabaseService) AddAccrualRecord(
 	_, err := db.conn.Exec(ctx, addTransactionSQL, orderID, sum, "ACCRUAL")
 	return err
 }
+
+func (db *DatabaseService) FindOrdersByUserID(
+	ctx context.Context,
+	userID int,
+) ([]models.Order, error) {
+	orders := make([]models.Order, 0)
+	rows, err := db.conn.Query(ctx, getOrdersByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		order := models.Order{}
+		if err := rows.Scan(&order.ID, &order.Status, &order.Accrual, &order.UploadedAt); err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(orders) == 0 {
+		return nil, ErrEmptyResult
+	}
+	return orders, nil
+}

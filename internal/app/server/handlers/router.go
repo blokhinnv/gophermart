@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/blokhinnv/gophermart/internal/app/accrual"
 	"github.com/blokhinnv/gophermart/internal/app/database"
 	"github.com/blokhinnv/gophermart/internal/app/server/config"
 	"github.com/go-chi/chi/v5"
@@ -25,9 +26,10 @@ func NewRouter(db database.Service, cfg *config.Config) chi.Router {
 		},
 	}
 	tokenAuth := jwtauth.New("HS256", []byte(cfg.JWTSigningKey), nil)
-	// TODO: DELETE
-	_ = tokenAuth
-	order := NewPostOrder(db, 10, 2, cfg.AccrualSystemAddress)
+
+	accrualService := accrual.NewAccrualService(cfg.AccrualSystemAddress)
+	postOrder := NewPostOrder(db, 10, 2, accrualService)
+	getOrder := GetOrder{db: db}
 
 	r.Use(middleware.Logger)
 	r.Route("/api/user", func(r chi.Router) {
@@ -40,7 +42,8 @@ func NewRouter(db database.Service, cfg *config.Config) chi.Router {
 		r.Group(func(r chi.Router) {
 			r.Use(jwtauth.Verifier(tokenAuth))
 			r.Use(jwtauth.Authenticator)
-			r.Post("/orders", order.Handler)
+			r.Post("/orders", postOrder.Handler)
+			r.Get("/orders", getOrder.Handler)
 		})
 	})
 

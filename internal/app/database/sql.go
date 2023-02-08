@@ -69,3 +69,17 @@ INSERT INTO Transaction(order_id, sum, transaction_type_id)
 	FROM TransactionType
 	WHERE type=$3;
 `
+const getOrdersByUserID = `
+WITH a AS (
+    SELECT order_id, SUM(sum) as sum
+    FROM Transaction
+    WHERE transaction_type_id=1
+    GROUP BY order_id
+)
+SELECT o.id AS "number", s.status, a.sum AS "accrual", o.uploaded_at
+FROM UserOrder o
+LEFT JOIN a ON o.id = a.order_id
+JOIN OrderStatus s ON s.id = o.status_id
+WHERE o.user_id = $1
+ORDER BY o.uploaded_at;
+`

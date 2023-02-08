@@ -180,3 +180,13 @@ func (db *DatabaseService) GetBalance(ctx context.Context, userID int) (*models.
 	}
 	return &balance, err
 }
+
+func (db *DatabaseService) AddWithdrawalRecord(
+	ctx context.Context,
+	orderID string,
+	sum float64,
+) error {
+	log.Printf("Adding withdrawal record orderID=%v sum=%v...", orderID, sum)
+	_, err := db.conn.Exec(ctx, addTransactionSQL, orderID, sum, "WITHDRAWAL")
+	return err
+}

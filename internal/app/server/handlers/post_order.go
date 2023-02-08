@@ -4,13 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"time"
 
-	"github.com/asaskevich/govalidator"
 	"github.com/blokhinnv/gophermart/internal/app/accrual"
 	"github.com/blokhinnv/gophermart/internal/app/database"
 	"github.com/go-chi/jwtauth/v5"
@@ -32,7 +29,7 @@ type accrualSystemResponse struct {
 	Accrual float64 `json:"accrual"`
 }
 
-const orderContentType = "text/plain"
+const postOrderContentType = "text/plain"
 
 func NewPostOrder(
 	db database.Service,
@@ -51,31 +48,22 @@ func NewPostOrder(
 }
 
 func (h *PostOrder) ReadBody(r *http.Request) (*postOrderBody, int, error) {
-	// проверим content-type
-	if r.Header.Get("Content-Type") != orderContentType {
-		return nil, http.StatusBadRequest, fmt.Errorf(
-			"%w: incorrect content type",
-			ErrIncorrectRequest,
-		)
+	bodyReader := func(bodyBytes []byte) (any, error) {
+		body := postOrderBody{OrderID: string(bodyBytes)}
+		return &body, nil
 	}
-	// проверим содержимое
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil || len(bodyBytes) == 0 {
-		return nil, http.StatusBadRequest, fmt.Errorf(
-			"%w: incorrent body (error while reading)",
-			ErrIncorrectRequest,
-		)
+	body, err := ReadBodyWithBodyReader(r, postOrderContentType, bodyReader)
+	if err != nil {
+		if errors.Is(err, ErrNotValid) {
+			return nil, http.StatusUnprocessableEntity, err
+		}
+		return nil, http.StatusBadRequest, err
 	}
-	body := postOrderBody{OrderID: string(bodyBytes)}
-	if validated, err := govalidator.ValidateStruct(body); err != nil || !validated {
-		return nil, http.StatusUnprocessableEntity, fmt.Errorf(
-			"%w: incorrent body (error while validating) %v",
-			ErrIncorrectRequest,
-			err.Error(),
-		)
+	if bodyTyped, ok := body.(*postOrderBody); ok {
+		return bodyTyped, http.StatusOK, nil
+	} else {
+		return nil, http.StatusInternalServerError, nil
 	}
-	return &body, http.StatusOK, nil
-
 }
 
 func (h *PostOrder) Loop() {

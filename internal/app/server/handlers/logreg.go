@@ -3,11 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
-	"github.com/asaskevich/govalidator"
 	"github.com/blokhinnv/gophermart/internal/app/database"
 )
 
@@ -26,33 +24,23 @@ type LogReg struct {
 
 // чтение тела запроса с проверкой корректности
 func (h *LogReg) ReadBody(r *http.Request) (*logRegRequestBody, int, error) {
-	// проверим content-type
-	if r.Header.Get("Content-Type") != logRegBodyContentType {
-		return nil, http.StatusBadRequest, fmt.Errorf(
-			"%w: incorrect content type",
-			ErrIncorrectRequest,
-		)
+	bodyReader := func(bodyBytes []byte) (any, error) {
+		body := logRegRequestBody{}
+		if err := json.Unmarshal(bodyBytes, &body); err != nil {
+			return nil, fmt.Errorf(
+				"%w: incorrent body (error while unmarshaling)",
+				ErrIncorrectRequest,
+			)
+		}
+		return &body, nil
 	}
-	// проверим содержимое
-	bodyBytes, err := io.ReadAll(r.Body)
+	body, err := ReadBodyWithBodyReader(r, logRegBodyContentType, bodyReader)
 	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf(
-			"%w: incorrent body (error while reading)",
-			ErrIncorrectRequest,
-		)
+		return nil, http.StatusBadRequest, err
 	}
-	body := logRegRequestBody{}
-	if err = json.Unmarshal(bodyBytes, &body); err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf(
-			"%w: incorrent body (error while unmarshaling)",
-			ErrIncorrectRequest,
-		)
+	if bodyTyped, ok := body.(*logRegRequestBody); ok {
+		return bodyTyped, http.StatusOK, nil
+	} else {
+		return nil, http.StatusInternalServerError, nil
 	}
-	if validated, err := govalidator.ValidateStruct(body); err != nil || !validated {
-		return nil, http.StatusBadRequest, fmt.Errorf(
-			"%w: incorrent body (error while validating)",
-			ErrIncorrectRequest,
-		)
-	}
-	return &body, http.StatusOK, nil
 }

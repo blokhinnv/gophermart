@@ -67,7 +67,6 @@ func (suite *PostOrderTestSuite) makeRequest(body io.Reader, auth bool) *httptes
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer: %v", suite.tokenSign))
 	}
 	suite.handler.ServeHTTP(rr, req)
-	fmt.Println(rr.Body.String())
 	return rr
 }
 

@@ -210,7 +210,6 @@ func (suite *GetOrdersTestSuite) TestMany() {
 		start.Format(time.RFC3339),
 		start.Add(5*time.Second).Format(time.RFC3339),
 	)
-	fmt.Println("HERE!", rr.Body.String())
 	assert.JSONEq(suite.T(), expected, rr.Body.String())
 }
 

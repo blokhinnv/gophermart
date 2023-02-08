@@ -78,6 +78,20 @@ func (mr *MockServiceMockRecorder) AddUser(arg0, arg1, arg2 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUser", reflect.TypeOf((*MockService)(nil).AddUser), arg0, arg1, arg2)
 }
 
+// AddWithdrawalRecord mocks base method.
+func (m *MockService) AddWithdrawalRecord(arg0 context.Context, arg1 string, arg2 float64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddWithdrawalRecord", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddWithdrawalRecord indicates an expected call of AddWithdrawalRecord.
+func (mr *MockServiceMockRecorder) AddWithdrawalRecord(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddWithdrawalRecord", reflect.TypeOf((*MockService)(nil).AddWithdrawalRecord), arg0, arg1, arg2)
+}
+
 // FindOrderByID mocks base method.
 func (m *MockService) FindOrderByID(arg0 context.Context, arg1 string) (*models.Order, error) {
 	m.ctrl.T.Helper()

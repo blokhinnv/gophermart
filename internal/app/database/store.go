@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 
+	"github.com/blokhinnv/gophermart/internal/app/database/ordertracker"
 	"github.com/blokhinnv/gophermart/internal/app/models"
 )
 
@@ -17,4 +18,5 @@ type Service interface {
 	GetBalance(ctx context.Context, userID int) (*models.Balance, error)
 	AddWithdrawalRecord(ctx context.Context, orderID string, sum float64, userID int) error
 	GetWithdrawals(ctx context.Context, userID int) ([]models.Withdrawal, error)
+	Tracker() ordertracker.Tracker
 }

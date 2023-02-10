@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+
 	"github.com/blokhinnv/gophermart/internal/app/accrual"
 	"github.com/blokhinnv/gophermart/internal/app/database"
 	"github.com/blokhinnv/gophermart/internal/app/server/config"
@@ -28,7 +30,7 @@ func NewRouter(db database.Service, cfg *config.Config) chi.Router {
 	tokenAuth := jwtauth.New("HS256", []byte(cfg.JWTSigningKey), nil)
 
 	accrualService := accrual.NewAccrualService(cfg.AccrualSystemAddress)
-	postOrder := NewPostOrder(db, 10, 2, accrualService)
+	postOrder := NewPostOrder(context.Background(), db, 2, accrualService)
 	getOrder := GetOrder{db: db}
 	balance := Balance{db: db}
 	withdraw := Withdraw{db: db}

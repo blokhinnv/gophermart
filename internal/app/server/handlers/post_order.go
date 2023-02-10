@@ -6,15 +6,20 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/blokhinnv/gophermart/internal/app/accrual"
 	"github.com/blokhinnv/gophermart/internal/app/database"
+	"github.com/blokhinnv/gophermart/internal/app/database/ordertracker"
+	"github.com/jackc/pgx/v5"
+	"golang.org/x/sync/errgroup"
 )
 
 type PostOrder struct {
 	db            database.Service
-	c             chan string
+	tracker       ordertracker.Tracker
 	accrualSystem accrual.Service
+	ctx           context.Context
 }
 
 type postOrderBody struct {
@@ -30,19 +35,83 @@ type accrualSystemResponse struct {
 const postOrderContentType = "text/plain"
 
 func NewPostOrder(
+	ctx context.Context,
 	db database.Service,
-	cSize, nWorkers int,
+	nWorkers int,
 	accrualSystem accrual.Service,
 ) *PostOrder {
 	o := PostOrder{
 		db:            db,
-		c:             make(chan string, cSize),
+		tracker:       db.Tracker(),
 		accrualSystem: accrualSystem,
 	}
+	o.ctx = ctx
+	g, _ := errgroup.WithContext(ctx)
 	for i := 0; i < nWorkers; i++ {
-		go o.Loop()
+		g.Go(o.Loop)
 	}
 	return &o
+}
+
+func (h *PostOrder) Loop() error {
+	ticker := time.NewTicker(1000 * time.Millisecond)
+	for range ticker.C {
+		// забираем задачу
+		task, err := h.tracker.Acquire(h.ctx)
+		// fmt.Println("HERE1", err)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				continue
+			}
+			return err
+		}
+		// делаем запрос к системе расчета баллов
+		res, err := h.accrualSystem.GetOrderInfo(task.OrderID)
+		if err != nil {
+			// если заспамили - возвращаем задачу в работу и отдыхаем 5 секунд
+			if errors.Is(err, accrual.ErrTooManyRequests) {
+				err = h.tracker.UpdateStatusAndRelease(h.ctx, task.StatusID, task.OrderID)
+				if err != nil {
+					return err
+				}
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			return err
+		}
+
+		resp := accrualSystemResponse{}
+		json.Unmarshal(res, &resp)
+		// обновить запись о заказе
+		err = h.db.UpdateOrderStatus(context.Background(), task.OrderID, resp.Status)
+		if err != nil {
+			return err
+		}
+		// проверить готовность
+		switch {
+		case resp.Status == "PROCESSED":
+			// если заказ обработан - добавим запись с баллами и удалим из очереди на обработку
+			err = h.db.AddAccrualRecord(context.Background(), task.OrderID, resp.Accrual)
+			if err != nil {
+				return err
+			}
+			err = h.tracker.Delete(h.ctx, task.OrderID)
+			if err != nil {
+				return err
+			}
+		case resp.Status == "REGISTERED" || resp.Status == "PROCESSING":
+			// если не обработан - возвращаем в работу
+			err = h.tracker.UpdateStatusAndRelease(
+				h.ctx,
+				database.STATUSES[resp.Status],
+				task.OrderID,
+			)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (h *PostOrder) ReadBody(r *http.Request) (*postOrderBody, int, error) {
@@ -61,29 +130,6 @@ func (h *PostOrder) ReadBody(r *http.Request) (*postOrderBody, int, error) {
 		return bodyTyped, http.StatusOK, nil
 	} else {
 		return nil, http.StatusInternalServerError, nil
-	}
-}
-
-func (h *PostOrder) Loop() {
-	for {
-		orderID := <-h.c
-		// делаем запрос к системе расчета баллов
-		res, err := h.accrualSystem.GetOrderInfo(orderID)
-		if err != nil {
-			log.Printf("Error while processing order %v: %v\n", orderID, err.Error())
-			continue
-		}
-		resp := accrualSystemResponse{}
-		json.Unmarshal(res, &resp)
-		// обновить запись о заказе
-		h.db.UpdateOrderStatus(context.Background(), orderID, resp.Status)
-		// проверить готовность
-		switch {
-		case resp.Status == "PROCESSED":
-			h.db.AddAccrualRecord(context.Background(), orderID, resp.Accrual)
-		case resp.Status == "REGISTERED" || resp.Status == "PROCESSING":
-			h.c <- orderID
-		}
 	}
 }
 
@@ -114,6 +160,6 @@ func (h *PostOrder) Handler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	h.c <- body.OrderID
+	h.tracker.Add(ctx, body.OrderID)
 	w.WriteHeader(http.StatusAccepted)
 }

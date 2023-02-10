@@ -8,6 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	ordertracker "github.com/blokhinnv/gophermart/internal/app/database/ordertracker"
 	models "github.com/blokhinnv/gophermart/internal/app/models"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -165,6 +166,20 @@ func (m *MockService) GetWithdrawals(arg0 context.Context, arg1 int) ([]models.W
 func (mr *MockServiceMockRecorder) GetWithdrawals(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWithdrawals", reflect.TypeOf((*MockService)(nil).GetWithdrawals), arg0, arg1)
+}
+
+// Tracker mocks base method.
+func (m *MockService) Tracker() ordertracker.Tracker {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Tracker")
+	ret0, _ := ret[0].(ordertracker.Tracker)
+	return ret0
+}
+
+// Tracker indicates an expected call of Tracker.
+func (mr *MockServiceMockRecorder) Tracker() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Tracker", reflect.TypeOf((*MockService)(nil).Tracker))
 }
 
 // UpdateOrderStatus mocks base method.

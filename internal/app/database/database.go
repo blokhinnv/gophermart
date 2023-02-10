@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"github.com/blokhinnv/gophermart/internal/app/auth"
+	"github.com/blokhinnv/gophermart/internal/app/database/ordertracker"
 	"github.com/blokhinnv/gophermart/internal/app/models"
 
 	"github.com/blokhinnv/gophermart/internal/app/server/config"
@@ -15,6 +16,14 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var STATUSES = map[string]int{
+	"NEW":        0,
+	"REGISTERED": 1,
+	"PROCESSING": 2,
+	"INVALID":    3,
+	"PROCESSED":  4,
+}
 
 type DatabaseService struct {
 	conn *pgxpool.Pool
@@ -42,8 +51,8 @@ func NewDatabaseService(
 	return &DatabaseService{conn: conn}, nil
 }
 
-func (db *DatabaseService) GetConn() *pgxpool.Pool {
-	return db.conn
+func (db *DatabaseService) Tracker() ordertracker.Tracker {
+	return ordertracker.NewDBTracker(db.conn)
 }
 
 func (db *DatabaseService) AddUser(

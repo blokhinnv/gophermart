@@ -2,6 +2,7 @@ package accrual
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -20,6 +21,9 @@ func (s *AccrualService) GetOrderInfo(orderID string) ([]byte, error) {
 	res, err := s.client.R().Get(orderID)
 	if err != nil {
 		return nil, err
+	}
+	if res.StatusCode() == http.StatusTooManyRequests {
+		return nil, ErrTooManyRequests
 	}
 	return res.Body(), nil
 }

@@ -1,7 +1,9 @@
 package handlers
 
+// TODO: тесты для tracker + accrualSystem?
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/blokhinnv/gophermart/internal/app/accrual"
 	"github.com/blokhinnv/gophermart/internal/app/database"
+	"github.com/blokhinnv/gophermart/internal/app/database/ordertracker"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
 )
@@ -19,30 +22,20 @@ type PostOrderTestSuite struct {
 	suite.Suite
 	AuthHandlerTestSuite
 	accrualService *accrual.MockService
+	tracker        *ordertracker.MockTracker
 }
 
 func (suite *PostOrderTestSuite) SetupSuite() {
 	suite.ctrl = gomock.NewController(suite.T())
 	suite.db = database.NewMockService(suite.ctrl)
+	suite.tracker = ordertracker.NewMockTracker(suite.ctrl)
 
 	suite.accrualService = accrual.NewMockService(suite.ctrl)
-	suite.accrualService.EXPECT().
-		GetOrderInfo(gomock.Eq("18")).
-		Return([]byte(`{
-			"order": "18",
-			"status": "PROCESSED",
-			"accrual": 500
-		}`), nil)
-
 	suite.db.EXPECT().
-		UpdateOrderStatus(gomock.Any(), gomock.Eq("18"), gomock.Any()).
-		Return(nil)
+		Tracker().
+		Return(suite.tracker)
 
-	suite.db.EXPECT().
-		AddAccrualRecord(gomock.Any(), gomock.Eq("18"), gomock.Any()).
-		Return(nil)
-
-	postOrder := NewPostOrder(suite.db, 10, 2, suite.accrualService)
+	postOrder := NewPostOrder(context.Background(), suite.db, 2, suite.accrualService)
 	handler := http.HandlerFunc(postOrder.Handler)
 	suite.setupAuth(handler)
 }
@@ -77,6 +70,11 @@ func (suite *PostOrderTestSuite) TestAccepted() {
 		AddOrder(gomock.Any(), gomock.Eq("18"), gomock.Eq(1)).
 		Times(1).
 		Return(nil)
+	suite.tracker.EXPECT().
+		Add(gomock.Any(), gomock.Eq("18")).
+		Times(1).
+		Return(nil)
+
 	rr := suite.makeRequest("TestAccepted", true, bytes.NewBuffer([]byte(`18`)))
 	suite.Equal(http.StatusAccepted, rr.Code)
 }

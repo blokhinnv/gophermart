@@ -46,6 +46,16 @@ CREATE TABLE Transaction(
 		FOREIGN KEY (transaction_type_id) REFERENCES TransactionType(id),
 	CONSTRAINT fk_order_id FOREIGN KEY (order_id) REFERENCES UserOrder(id)
 );
+
+DROP TABLE IF EXISTS Queue CASCADE;
+CREATE TABLE Queue(
+	id SERIAL PRIMARY KEY,
+	order_id VARCHAR NOT NULL,
+	status_id INTEGER NOT NULL DEFAULT 0,
+	lock BOOLEAN NOT NULL DEFAULT FALSE,
+	updated_at TIMESTAMP DEFAULT NOW(),
+	CONSTRAINT fk_status_id FOREIGN KEY (status_id) REFERENCES OrderStatus(id)
+);
 `
 
 const addUserSQL = `

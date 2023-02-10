@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/blokhinnv/gophermart/internal/app/database"
-	"github.com/go-chi/jwtauth/v5"
 )
 
 type Withdrawals struct {
@@ -15,13 +14,12 @@ type Withdrawals struct {
 
 func (h *Withdrawals) Handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	_, claims, _ := jwtauth.FromContext(ctx)
-	userID, ok := claims["user_id"].(float64)
-	if !ok {
-		http.Error(w, "no int user_id in claims", http.StatusInternalServerError)
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	withdrawals, err := h.db.GetWithdrawals(ctx, int(userID))
+	withdrawals, err := h.db.GetWithdrawals(ctx, userID)
 	if err != nil {
 		if errors.Is(err, database.ErrEmptyResult) {
 			http.Error(w, err.Error(), http.StatusNoContent)

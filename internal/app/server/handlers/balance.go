@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/blokhinnv/gophermart/internal/app/database"
-	"github.com/go-chi/jwtauth/v5"
 )
 
 type Balance struct {
@@ -14,13 +13,12 @@ type Balance struct {
 
 func (h *Balance) Handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	_, claims, _ := jwtauth.FromContext(ctx)
-	userID, ok := claims["user_id"].(float64)
-	if !ok {
-		http.Error(w, "no int user_id in claims", http.StatusInternalServerError)
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	balance, err := h.db.GetBalance(ctx, int(userID))
+	balance, err := h.db.GetBalance(ctx, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

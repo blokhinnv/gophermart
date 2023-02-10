@@ -10,7 +10,6 @@ import (
 
 	"github.com/blokhinnv/gophermart/internal/app/accrual"
 	"github.com/blokhinnv/gophermart/internal/app/database"
-	"github.com/go-chi/jwtauth/v5"
 )
 
 type PostOrder struct {
@@ -101,13 +100,12 @@ func (h *PostOrder) Handler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), status)
 		return
 	}
-	_, claims, _ := jwtauth.FromContext(ctx)
-	userID, ok := claims["user_id"].(float64)
-	if !ok {
-		http.Error(w, "no int user_id in claims", http.StatusInternalServerError)
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	err = h.db.AddOrder(ctx, body.OrderID, int(userID))
+	err = h.db.AddOrder(ctx, body.OrderID, userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, database.ErrOrderAlreadyAddedByThisUser):

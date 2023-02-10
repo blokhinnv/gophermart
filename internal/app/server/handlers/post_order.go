@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/blokhinnv/gophermart/internal/app/accrual"
 	"github.com/blokhinnv/gophermart/internal/app/database"
@@ -74,8 +73,6 @@ func (h *PostOrder) Loop() {
 			log.Printf("Error while processing order %v: %v\n", orderID, err.Error())
 			continue
 		}
-		// TODO: remove after debug
-		time.Sleep(10 * time.Second)
 		resp := accrualSystemResponse{}
 		json.Unmarshal(res, &resp)
 		// обновить запись о заказе

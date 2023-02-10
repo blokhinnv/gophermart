@@ -39,7 +39,7 @@ func (suite *WithdrawTestSuite) makeRequest(
 	body io.Reader,
 ) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodPost, "/api/user/widtdraw", body)
+	req, _ := http.NewRequest(http.MethodPost, "/api/user/balance/withdraw", body)
 	if setContentTypeHeader {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -82,26 +82,6 @@ func (suite *WithdrawTestSuite) TestBadOrderIDFormat() {
 	suite.Equal(http.StatusUnprocessableEntity, rr.Code)
 }
 
-func (suite *WithdrawTestSuite) TestNoOrderID() {
-	jsonStr := []byte(`{"order":"18", "sum": 10}`)
-
-	suite.db.EXPECT().
-		GetBalance(gomock.Any(), gomock.Eq(1)).
-		Times(1).
-		Return(&models.Balance{
-			Current:   sql.NullFloat64{Float64: 100, Valid: true},
-			Withdrawn: sql.NullFloat64{Float64: 100, Valid: true},
-		}, nil)
-
-	suite.db.EXPECT().
-		AddWithdrawalRecord(gomock.Any(), gomock.Eq("18"), gomock.Eq(10.0)).
-		Times(1).
-		Return(database.ErrMissingOrderID)
-
-	rr := suite.makeRequest("TestNoOrderID", true, true, bytes.NewBuffer(jsonStr))
-	suite.Equal(http.StatusUnprocessableEntity, rr.Code)
-}
-
 func (suite *WithdrawTestSuite) TestOK() {
 	jsonStr := []byte(`{"order":"18", "sum": 10}`)
 
@@ -114,7 +94,7 @@ func (suite *WithdrawTestSuite) TestOK() {
 		}, nil)
 
 	suite.db.EXPECT().
-		AddWithdrawalRecord(gomock.Any(), gomock.Eq("18"), gomock.Eq(10.0)).
+		AddWithdrawalRecord(gomock.Any(), gomock.Eq("18"), gomock.Eq(10.0), gomock.Eq(1)).
 		Times(1).
 		Return(nil)
 

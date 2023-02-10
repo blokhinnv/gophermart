@@ -74,7 +74,7 @@ func (h *Withdraw) Handler(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	err = h.db.AddWithdrawalRecord(ctx, body.OrderID, body.Sum)
+	err = h.db.AddWithdrawalRecord(ctx, body.OrderID, body.Sum, userID)
 	if err != nil {
 		if errors.Is(err, database.ErrMissingOrderID) {
 			http.Error(w, err.Error(), http.StatusUnprocessableEntity)

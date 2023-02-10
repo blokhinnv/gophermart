@@ -185,9 +185,18 @@ func (db *DatabaseService) AddWithdrawalRecord(
 	ctx context.Context,
 	orderID string,
 	sum float64,
+	userID int,
 ) error {
 	log.Printf("Adding withdrawal record orderID=%v sum=%v...", orderID, sum)
-	_, err := db.conn.Exec(ctx, addTransactionSQL, orderID, sum, "WITHDRAWAL")
+	// если заказа не было - добавим
+	err := db.AddOrder(ctx, orderID, userID)
+	if err != nil {
+		if !errors.Is(err, ErrOrderAlreadyAddedByOtherUser) &&
+			!errors.Is(err, ErrOrderAlreadyAddedByThisUser) {
+			return err
+		}
+	}
+	_, err = db.conn.Exec(ctx, addTransactionSQL, orderID, sum, "WITHDRAWAL")
 	if err != nil {
 		var pgerr *pgconn.PgError
 		if errors.As(err, &pgerr) {

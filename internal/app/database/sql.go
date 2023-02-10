@@ -84,9 +84,12 @@ WHERE o.user_id = $1
 ORDER BY o.uploaded_at;
 `
 const getBalanceSQL = `
-SELECT
-    SUM(CASE WHEN transaction_type_id=1 THEN t.sum END) - SUM(CASE WHEN transaction_type_id=2 THEN t.sum END) AS balance,
-    SUM(CASE WHEN transaction_type_id=2 THEN t.sum END) AS withdrawn
+SELECT (
+	COALESCE(SUM(CASE WHEN transaction_type_id=1 THEN t.sum END), 0) -
+	COALESCE(SUM(CASE WHEN transaction_type_id=2 THEN t.sum END), 0)
+) AS balance, (
+	COALESCE(SUM(CASE WHEN transaction_type_id=2 THEN t.sum END), 0)
+) AS withdrawn
 FROM Transaction t
 JOIN UserOrder o ON o.id = t.order_id
 WHERE o.user_id = $1;

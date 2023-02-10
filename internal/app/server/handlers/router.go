@@ -44,11 +44,11 @@ func NewRouter(db database.Service, cfg *config.Config) chi.Router {
 		// доступны с авторизацией
 		r.Group(func(r chi.Router) {
 			r.Use(jwtauth.Verifier(tokenAuth))
-			r.Use(Authenticator)
+			r.Use(jwtauth.Authenticator)
 			r.Post("/orders", postOrder.Handler)
 			r.Get("/orders", getOrder.Handler)
 			r.Get("/balance", balance.Handler)
-			r.Post("/withdraw", withdraw.Handler)
+			r.Post("/balance/withdraw", withdraw.Handler)
 			r.Get("/withdrawals", withdrawals.Handler)
 		})
 	})

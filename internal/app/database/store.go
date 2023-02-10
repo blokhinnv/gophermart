@@ -15,6 +15,6 @@ type Service interface {
 	AddAccrualRecord(ctx context.Context, orderID string, sum float64) error
 	FindOrdersByUserID(ctx context.Context, userID int) ([]models.Order, error)
 	GetBalance(ctx context.Context, userID int) (*models.Balance, error)
-	AddWithdrawalRecord(ctx context.Context, orderID string, sum float64) error
+	AddWithdrawalRecord(ctx context.Context, orderID string, sum float64, userID int) error
 	GetWithdrawals(ctx context.Context, userID int) ([]models.Withdrawal, error)
 }

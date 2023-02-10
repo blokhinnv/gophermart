@@ -34,6 +34,14 @@ func (suite *PostOrderTestSuite) SetupSuite() {
 			"accrual": 500
 		}`), nil)
 
+	suite.db.EXPECT().
+		UpdateOrderStatus(gomock.Any(), gomock.Eq("18"), gomock.Any()).
+		Return(nil)
+
+	suite.db.EXPECT().
+		AddAccrualRecord(gomock.Any(), gomock.Eq("18"), gomock.Any()).
+		Return(nil)
+
 	postOrder := NewPostOrder(suite.db, 10, 2, suite.accrualService)
 	handler := http.HandlerFunc(postOrder.Handler)
 	suite.setupAuth(handler)

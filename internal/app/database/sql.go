@@ -91,3 +91,11 @@ FROM Transaction t
 JOIN UserOrder o ON o.id = t.order_id
 WHERE o.user_id = $1;
 `
+
+const getWithdrawalsSQL = `
+SELECT order_id AS order, sum, processed_at
+FROM Transaction t
+JOIN UserOrder o ON o.id = t.order_id
+WHERE o.user_id = $1 AND t.transaction_type_id=2
+ORDER BY t.processed_at;
+`

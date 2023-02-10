@@ -198,3 +198,29 @@ func (db *DatabaseService) AddWithdrawalRecord(
 	}
 	return err
 }
+
+func (db *DatabaseService) GetWithdrawals(
+	ctx context.Context,
+	userID int,
+) ([]models.Withdrawal, error) {
+	withdrawals := make([]models.Withdrawal, 0)
+	rows, err := db.conn.Query(ctx, getWithdrawalsSQL, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		wd := models.Withdrawal{}
+		if err := rows.Scan(&wd.Order, &wd.Sum, &wd.ProcessedAt); err != nil {
+			return nil, err
+		}
+		withdrawals = append(withdrawals, wd)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(withdrawals) == 0 {
+		return nil, ErrEmptyResult
+	}
+	return withdrawals, nil
+}

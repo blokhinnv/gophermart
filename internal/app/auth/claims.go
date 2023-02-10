@@ -1,9 +1,9 @@
 package auth
 
-import "github.com/dgrijalva/jwt-go/v4"
+import "github.com/golang-jwt/jwt/v4"
 
 type Claims struct {
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 	UserID   int    `json:"user_id"`
 	Username string `json:"username"`
 }

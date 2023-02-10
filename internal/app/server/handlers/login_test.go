@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"bytes"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -23,12 +23,18 @@ type LoginTestSuite struct {
 	ctrl    *gomock.Controller
 }
 
-func (suite *LoginTestSuite) makeRequest(body io.Reader) *httptest.ResponseRecorder {
+func (suite *LoginTestSuite) makeRequest(
+	testName string,
+	setContentType bool,
+	body io.Reader,
+) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodPost, "/api/user/login", body)
-	req.Header.Set("Content-Type", "application/json")
+	if setContentType {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	suite.handler.ServeHTTP(rr, req)
-	fmt.Println(rr.Body.String())
+	log.Printf("[%v]: %v", testName, rr.Body.String())
 	return rr
 
 }
@@ -62,7 +68,7 @@ func (suite *LoginTestSuite) TestOk() {
 			Salt:           "456",
 		}, nil)
 
-	rr := suite.makeRequest(bytes.NewBuffer(jsonStr))
+	rr := suite.makeRequest("TestOk", true, bytes.NewBuffer(jsonStr))
 	suite.Equal(http.StatusOK, rr.Code)
 }
 
@@ -78,15 +84,19 @@ func (suite *LoginTestSuite) TestWrong() {
 			Salt:           "456",
 		}, nil)
 
-	resp1 := suite.makeRequest(bytes.NewBuffer(jsonStr))
+	resp1 := suite.makeRequest("TestWrong", true, bytes.NewBuffer(jsonStr))
 	suite.Equal(http.StatusUnauthorized, resp1.Code)
 }
 
 func (suite *LoginTestSuite) TestIncorrentBody() {
 	jsonStr := []byte(`{"login":"nikita", "pass`)
-	resp1 := suite.makeRequest(bytes.NewBuffer(jsonStr))
+	resp1 := suite.makeRequest("TestIncorrentBody", true, bytes.NewBuffer(jsonStr))
 	suite.Equal(http.StatusBadRequest, resp1.Code)
+}
 
+func (suite *LoginTestSuite) TestNoContentType() {
+	resp1 := suite.makeRequest("TestNoContentType", false, nil)
+	suite.Equal(http.StatusBadRequest, resp1.Code)
 }
 
 func TestLoginTestSuite(t *testing.T) {

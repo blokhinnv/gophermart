@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -23,14 +24,19 @@ type RegisterTestSuite struct {
 	ctrl    *gomock.Controller
 }
 
-func (suite *RegisterTestSuite) makeRequest(body io.Reader) *httptest.ResponseRecorder {
+func (suite *RegisterTestSuite) makeRequest(
+	testName string,
+	setContentTypeHeader bool,
+	body io.Reader,
+) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodPost, "/api/user/register", body)
-	req.Header.Set("Content-Type", "application/json")
+	if setContentTypeHeader {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	suite.handler.ServeHTTP(rr, req)
-	fmt.Println(rr.Body.String())
+	log.Printf("[%v]: %v", testName, rr.Body.String())
 	return rr
-
 }
 
 func (suite *RegisterTestSuite) SetupSuite() {
@@ -63,7 +69,7 @@ func (suite *RegisterTestSuite) TestSingle() {
 			Salt:           "456",
 		}, nil)
 
-	rr := suite.makeRequest(bytes.NewBuffer(jsonStr))
+	rr := suite.makeRequest("TestSingle", true, bytes.NewBuffer(jsonStr))
 	suite.Equal(http.StatusOK, rr.Code)
 }
 
@@ -78,19 +84,25 @@ func (suite *RegisterTestSuite) TestAlreadyExisted() {
 			HashedPassword: auth.GenerateHash("123", "456"),
 			Salt:           "456",
 		}, nil)
-	resp1 := suite.makeRequest(bytes.NewBuffer(jsonStr))
+	resp1 := suite.makeRequest("TestAlreadyExisted", true, bytes.NewBuffer(jsonStr))
 	suite.Equal(http.StatusOK, resp1.Code)
 	suite.db.EXPECT().
 		AddUser(gomock.Any(), gomock.Eq("nikita"), gomock.Eq("123")).
 		Times(1).
 		Return(nil, fmt.Errorf("%w: %v", database.ErrUserAlreadyExists, "nikita"))
-	resp2 := suite.makeRequest(bytes.NewBuffer(jsonStr))
+	resp2 := suite.makeRequest("TestAlreadyExisted", true, bytes.NewBuffer(jsonStr))
 	suite.Equal(http.StatusConflict, resp2.Code)
 }
 
 func (suite *RegisterTestSuite) TestIncorrentBody() {
 	jsonStr := []byte(`{"login":"nikita", "pass`)
-	resp1 := suite.makeRequest(bytes.NewBuffer(jsonStr))
+	resp1 := suite.makeRequest("TestIncorrentBody", true, bytes.NewBuffer(jsonStr))
+	suite.Equal(http.StatusBadRequest, resp1.Code)
+}
+
+func (suite *RegisterTestSuite) TestNoContentType() {
+	jsonStr := []byte(`{"login":"nikita", "pass`)
+	resp1 := suite.makeRequest("TestNoContentType", false, bytes.NewBuffer(jsonStr))
 	suite.Equal(http.StatusBadRequest, resp1.Code)
 
 }

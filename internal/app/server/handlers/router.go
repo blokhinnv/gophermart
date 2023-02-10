@@ -31,6 +31,7 @@ func NewRouter(db database.Service, cfg *config.Config) chi.Router {
 	postOrder := NewPostOrder(db, 10, 2, accrualService)
 	getOrder := GetOrder{db: db}
 	balance := Balance{db: db}
+	withdraw := Withdraw{db: db}
 
 	r.Use(middleware.Logger)
 	r.Route("/api/user", func(r chi.Router) {
@@ -46,6 +47,7 @@ func NewRouter(db database.Service, cfg *config.Config) chi.Router {
 			r.Post("/orders", postOrder.Handler)
 			r.Get("/orders", getOrder.Handler)
 			r.Get("/balance", balance.Handler)
+			r.Post("/withdraw", withdraw.Handler)
 		})
 	})
 

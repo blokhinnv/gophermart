@@ -3,65 +3,52 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/blokhinnv/gophermart/internal/app/auth"
 	"github.com/blokhinnv/gophermart/internal/app/database"
 	"github.com/blokhinnv/gophermart/internal/app/models"
-	"github.com/go-chi/jwtauth/v5"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
 type GetOrdersTestSuite struct {
-	suite.Suite
-	db        *database.MockService
-	handler   http.Handler
-	tokenSign string
-	ctrl      *gomock.Controller
+	AuthHandlerTestSuite
 }
 
 func (suite *GetOrdersTestSuite) SetupSuite() {
 	suite.ctrl = gomock.NewController(suite.T())
 	suite.db = database.NewMockService(suite.ctrl)
-
-	signingKey := []byte("qwerty")
-	token := auth.GenerateJWTToken(
-		&models.User{ID: 1, Username: "nikita"},
-		signingKey,
-		time.Hour,
-	)
-	tokenSign, _ := token.SignedString(signingKey)
-	suite.tokenSign = tokenSign
-	tokenAuth := jwtauth.New("HS256", signingKey, nil)
-
-	postOrder := GetOrder{db: suite.db}
-	verifier := jwtauth.Verifier(tokenAuth)
-	authentifier := jwtauth.Authenticator
-	handler := http.HandlerFunc(postOrder.Handler)
-	suite.handler = verifier(authentifier(handler))
-
+	getOrder := GetOrder{db: suite.db}
+	handler := http.HandlerFunc(getOrder.Handler)
+	suite.setupAuth(handler)
 }
 
-func (suite *GetOrdersTestSuite) makeRequest(auth bool) *httptest.ResponseRecorder {
+func (suite *GetOrdersTestSuite) TearDownSuite() {
+	suite.ctrl.Finish()
+}
+
+func (suite *GetOrdersTestSuite) makeRequest(
+	testName string,
+	auth bool,
+) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/api/user/orders", nil)
 	req.Header.Set("Content-Type", "text/plain")
-
 	if auth {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer: %v", suite.tokenSign))
 	}
 	suite.handler.ServeHTTP(rr, req)
-	fmt.Println(rr.Body.String())
+	log.Printf("[%v]: %v", testName, rr.Body.String())
 	return rr
 }
 
 func (suite *GetOrdersTestSuite) TestNoAuth() {
-	rr := suite.makeRequest(false)
+	rr := suite.makeRequest("TestNoAuth", false)
 	suite.Equal(http.StatusUnauthorized, rr.Code)
 }
 
@@ -71,7 +58,7 @@ func (suite *GetOrdersTestSuite) TestNoContent() {
 		Times(1).
 		Return(nil, database.ErrEmptyResult)
 
-	rr := suite.makeRequest(true)
+	rr := suite.makeRequest("TestNoContent", true)
 	suite.Equal(http.StatusNoContent, rr.Code)
 }
 
@@ -91,7 +78,7 @@ func (suite *GetOrdersTestSuite) TestNew() {
 		Times(1).
 		Return(orders, nil)
 
-	rr := suite.makeRequest(true)
+	rr := suite.makeRequest("TestNew", true)
 
 	suite.Equal(http.StatusOK, rr.Code)
 	expected := fmt.Sprintf(
@@ -117,7 +104,7 @@ func (suite *GetOrdersTestSuite) TestProcessing() {
 		Times(1).
 		Return(orders, nil)
 
-	rr := suite.makeRequest(true)
+	rr := suite.makeRequest("TestProcessing", true)
 
 	suite.Equal(http.StatusOK, rr.Code)
 	expected := fmt.Sprintf(
@@ -143,7 +130,7 @@ func (suite *GetOrdersTestSuite) TestInvalid() {
 		Times(1).
 		Return(orders, nil)
 
-	rr := suite.makeRequest(true)
+	rr := suite.makeRequest("TestInvalid", true)
 
 	suite.Equal(http.StatusOK, rr.Code)
 	expected := fmt.Sprintf(
@@ -169,7 +156,7 @@ func (suite *GetOrdersTestSuite) TestProcessed() {
 		Times(1).
 		Return(orders, nil)
 
-	rr := suite.makeRequest(true)
+	rr := suite.makeRequest("TestProcessed", true)
 
 	suite.Equal(http.StatusOK, rr.Code)
 	expected := fmt.Sprintf(
@@ -201,7 +188,7 @@ func (suite *GetOrdersTestSuite) TestMany() {
 		Times(1).
 		Return(orders, nil)
 
-	rr := suite.makeRequest(true)
+	rr := suite.makeRequest("TestMany", true)
 
 	suite.Equal(http.StatusOK, rr.Code)
 	expected := fmt.Sprintf(
@@ -213,6 +200,6 @@ func (suite *GetOrdersTestSuite) TestMany() {
 	assert.JSONEq(suite.T(), expected, rr.Body.String())
 }
 
-func TestGetOrdersSuite(t *testing.T) {
+func TestGetOrdersTestSuite(t *testing.T) {
 	suite.Run(t, new(GetOrdersTestSuite))
 }

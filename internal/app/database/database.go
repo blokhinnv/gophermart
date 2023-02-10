@@ -188,5 +188,13 @@ func (db *DatabaseService) AddWithdrawalRecord(
 ) error {
 	log.Printf("Adding withdrawal record orderID=%v sum=%v...", orderID, sum)
 	_, err := db.conn.Exec(ctx, addTransactionSQL, orderID, sum, "WITHDRAWAL")
+	if err != nil {
+		var pgerr *pgconn.PgError
+		if errors.As(err, &pgerr) {
+			if pgerr.Code == pgerrcode.ForeignKeyViolation {
+				return fmt.Errorf("%w: %v", ErrMissingOrderID, orderID)
+			}
+		}
+	}
 	return err
 }

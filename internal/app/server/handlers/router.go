@@ -44,7 +44,7 @@ func NewRouter(db database.Service, cfg *config.Config) chi.Router {
 		// доступны с авторизацией
 		r.Group(func(r chi.Router) {
 			r.Use(jwtauth.Verifier(tokenAuth))
-			r.Use(jwtauth.Authenticator)
+			r.Use(Authenticator)
 			r.Post("/orders", postOrder.Handler)
 			r.Get("/orders", getOrder.Handler)
 			r.Get("/balance", balance.Handler)

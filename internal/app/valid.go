@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	govalidator.CustomTypeTagMap.Set("orderID", func(i interface{}, context interface{}) bool {
+	govalidator.CustomTypeTagMap.Set("luhn", func(i interface{}, context interface{}) bool {
 		v, ok := i.(string)
 		if !ok {
 			return false

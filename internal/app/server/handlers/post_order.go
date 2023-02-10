@@ -18,7 +18,7 @@ type PostOrder struct {
 }
 
 type postOrderBody struct {
-	OrderID string `valid:"orderID,required"`
+	OrderID string `valid:"luhn,required"`
 }
 
 type accrualSystemResponse struct {

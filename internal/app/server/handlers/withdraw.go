@@ -15,8 +15,8 @@ type Withdraw struct {
 }
 
 type withdrawRequestBody struct {
-	OrderID string  `valid:"orderID,required" json:"order"`
-	Sum     float64 `valid:",required"        json:"sum"`
+	OrderID string  `valid:"luhn,required" json:"order"`
+	Sum     float64 `valid:"required"      json:"sum"`
 }
 
 const withdrawContentType = "application/json"

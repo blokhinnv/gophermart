@@ -242,3 +242,8 @@ func (db *DatabaseService) GetWithdrawals(
 	}
 	return withdrawals, nil
 }
+
+func (s *DatabaseService) Close() {
+	log.Println("Closing DB connection...")
+	s.conn.Close()
+}

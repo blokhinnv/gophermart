@@ -3,7 +3,6 @@ package handlers
 // TODO: тесты для tracker + accrualSystem?
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"log"
@@ -35,7 +34,7 @@ func (suite *PostOrderTestSuite) SetupSuite() {
 		Tracker().
 		Return(suite.tracker)
 
-	postOrder := NewPostOrder(context.Background(), suite.db, 2, suite.accrualService)
+	postOrder, _ := NewPostOrder(suite.db, 2, suite.accrualService)
 	handler := http.HandlerFunc(postOrder.Handler)
 	suite.setupAuth(handler)
 }

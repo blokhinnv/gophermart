@@ -93,6 +93,18 @@ func (mr *MockServiceMockRecorder) AddWithdrawalRecord(arg0, arg1, arg2, arg3 in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddWithdrawalRecord", reflect.TypeOf((*MockService)(nil).AddWithdrawalRecord), arg0, arg1, arg2, arg3)
 }
 
+// Close mocks base method.
+func (m *MockService) Close() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Close")
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockServiceMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockService)(nil).Close))
+}
+
 // FindOrderByID mocks base method.
 func (m *MockService) FindOrderByID(arg0 context.Context, arg1 string) (*models.Order, error) {
 	m.ctrl.T.Helper()

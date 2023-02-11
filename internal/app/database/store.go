@@ -19,4 +19,5 @@ type Service interface {
 	AddWithdrawalRecord(ctx context.Context, orderID string, sum float64, userID int) error
 	GetWithdrawals(ctx context.Context, userID int) ([]models.Withdrawal, error)
 	Tracker() ordertracker.Tracker
+	Close()
 }

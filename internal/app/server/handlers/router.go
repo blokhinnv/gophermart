@@ -11,8 +11,22 @@ import (
 	"github.com/go-chi/jwtauth/v5"
 )
 
-func NewRouter(db database.Service, cfg *config.Config) chi.Router {
-	r := chi.NewRouter()
+type Router struct {
+	*chi.Mux
+	handlerContextCloseFuncs []context.CancelFunc
+}
+
+func (r *Router) Shutdown() {
+	for _, cancel := range r.handlerContextCloseFuncs {
+		cancel()
+	}
+}
+
+func NewRouter(db database.Service, cfg *config.Config) Router {
+	r := Router{
+		Mux:                      chi.NewRouter(),
+		handlerContextCloseFuncs: make([]context.CancelFunc, 0),
+	}
 	reg := Register{
 		LogReg: LogReg{
 			db:             db,
@@ -28,9 +42,9 @@ func NewRouter(db database.Service, cfg *config.Config) chi.Router {
 		},
 	}
 	tokenAuth := jwtauth.New("HS256", []byte(cfg.JWTSigningKey), nil)
-
 	accrualService := accrual.NewAccrualService(cfg.AccrualSystemAddress)
-	postOrder := NewPostOrder(context.Background(), db, 2, accrualService)
+	postOrder, cancel := NewPostOrder(db, 2, accrualService)
+	r.handlerContextCloseFuncs = append(r.handlerContextCloseFuncs, cancel)
 	getOrder := GetOrder{db: db}
 	balance := Balance{db: db}
 	withdraw := Withdraw{db: db}

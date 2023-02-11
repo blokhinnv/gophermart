@@ -35,80 +35,98 @@ type accrualSystemResponse struct {
 const postOrderContentType = "text/plain"
 
 func NewPostOrder(
-	ctx context.Context,
 	db database.Service,
 	nWorkers int,
 	accrualSystem accrual.Service,
-) *PostOrder {
+) (*PostOrder, context.CancelFunc) {
 	o := PostOrder{
 		db:            db,
 		tracker:       db.Tracker(),
 		accrualSystem: accrualSystem,
 	}
-	o.ctx = ctx
-	g, _ := errgroup.WithContext(ctx)
+	handlerCtx, cancel := context.WithCancel(context.Background())
+	g, _ := errgroup.WithContext(handlerCtx)
 	for i := 0; i < nWorkers; i++ {
 		g.Go(o.Loop)
 	}
-	return &o
+	cancelAndWait := func() {
+		cancel()
+		// заблокируемся до тех пор, пока все функции не поумирают?
+		g.Wait()
+	}
+	o.ctx = handlerCtx
+	return &o, cancelAndWait
 }
 
 func (h *PostOrder) Loop() error {
 	ticker := time.NewTicker(1000 * time.Millisecond)
-	for range ticker.C {
-		// забираем задачу
-		task, err := h.tracker.Acquire(h.ctx)
-		// fmt.Println("HERE1", err)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				continue
+	for {
+		select {
+		case <-h.ctx.Done():
+			// это убьёт всю errgroup
+			log.Println("Shutting down Loop goroutine...")
+			return ErrServerShutdown
+		case <-ticker.C:
+			err := h.LoopIteration()
+			if err != nil {
+				return err
 			}
-			return err
 		}
-		// делаем запрос к системе расчета баллов
-		res, err := h.accrualSystem.GetOrderInfo(task.OrderID)
-		if err != nil {
-			// если заспамили - возвращаем задачу в работу и отдыхаем 5 секунд
-			if errors.Is(err, accrual.ErrTooManyRequests) {
-				err = h.tracker.UpdateStatusAndRelease(h.ctx, task.StatusID, task.OrderID)
-				if err != nil {
-					return err
-				}
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			return err
-		}
+	}
+}
 
-		resp := accrualSystemResponse{}
-		json.Unmarshal(res, &resp)
-		// обновить запись о заказе
-		err = h.db.UpdateOrderStatus(context.Background(), task.OrderID, resp.Status)
+func (h *PostOrder) LoopIteration() error {
+	// забираем задачу
+	task, err := h.tracker.Acquire(h.ctx)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	// делаем запрос к системе расчета баллов
+	res, err := h.accrualSystem.GetOrderInfo(task.OrderID)
+	if err != nil {
+		// если заспамили - возвращаем задачу в работу и отдыхаем 5 секунд
+		if errors.Is(err, accrual.ErrTooManyRequests) {
+			err = h.tracker.UpdateStatusAndRelease(h.ctx, task.StatusID, task.OrderID)
+			if err != nil {
+				return err
+			}
+			time.Sleep(5 * time.Second)
+			return nil
+		}
+		return err
+	}
+
+	resp := accrualSystemResponse{}
+	json.Unmarshal(res, &resp)
+	// обновить запись о заказе
+	err = h.db.UpdateOrderStatus(context.Background(), task.OrderID, resp.Status)
+	if err != nil {
+		return err
+	}
+	// проверить готовность
+	switch {
+	case resp.Status == "PROCESSED":
+		// если заказ обработан - добавим запись с баллами и удалим из очереди на обработку
+		err = h.db.AddAccrualRecord(context.Background(), task.OrderID, resp.Accrual)
 		if err != nil {
 			return err
 		}
-		// проверить готовность
-		switch {
-		case resp.Status == "PROCESSED":
-			// если заказ обработан - добавим запись с баллами и удалим из очереди на обработку
-			err = h.db.AddAccrualRecord(context.Background(), task.OrderID, resp.Accrual)
-			if err != nil {
-				return err
-			}
-			err = h.tracker.Delete(h.ctx, task.OrderID)
-			if err != nil {
-				return err
-			}
-		case resp.Status == "REGISTERED" || resp.Status == "PROCESSING":
-			// если не обработан - возвращаем в работу
-			err = h.tracker.UpdateStatusAndRelease(
-				h.ctx,
-				database.STATUSES[resp.Status],
-				task.OrderID,
-			)
-			if err != nil {
-				return err
-			}
+		err = h.tracker.Delete(h.ctx, task.OrderID)
+		if err != nil {
+			return err
+		}
+	case resp.Status == "REGISTERED" || resp.Status == "PROCESSING":
+		// если не обработан - возвращаем в работу
+		err = h.tracker.UpdateStatusAndRelease(
+			h.ctx,
+			database.STATUSES[resp.Status],
+			task.OrderID,
+		)
+		if err != nil {
+			return err
 		}
 	}
 	return nil

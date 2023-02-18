@@ -47,11 +47,15 @@ jobs:
       - name: Setup migrate
         run: |
           curl -L https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz -o "migrate.tar.gz"
-          tar -xf migrate.tar.gz migrate
+          tar -xvf migrate.tar.gz migrate
+          chmod +x migrate
+          echo pwd
 
 
       - name: Run migrate
         run: |
+          ls
+          echo pwd
           migrate -path internal/app/database/migration -database "postgresql://postgres:postgres@postgres/praktikum?sslmode=disable" -verbose up
 
 

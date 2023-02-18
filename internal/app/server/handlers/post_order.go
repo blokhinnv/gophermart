@@ -43,16 +43,15 @@ func NewPostOrder(
 	nWorkers int,
 	serverCtx context.Context,
 	accrualSystem accrual.Service,
-	accrualSystemPoolInterval, accrualSystemTMRSleepInterval time.Duration,
+	accrualSystemPoolInterval time.Duration,
 ) *PostOrder {
 
 	o := PostOrder{
-		db:                            db,
-		tracker:                       db.Tracker(),
-		accrualSystem:                 accrualSystem,
-		accrualSystemPoolInterval:     accrualSystemPoolInterval,
-		accrualSystemTMRSleepInterval: accrualSystemTMRSleepInterval,
-		wg:                            new(sync.WaitGroup),
+		db:                        db,
+		tracker:                   db.Tracker(),
+		accrualSystem:             accrualSystem,
+		accrualSystemPoolInterval: accrualSystemPoolInterval,
+		wg:                        new(sync.WaitGroup),
 	}
 	g, _ := errgroup.WithContext(serverCtx)
 	for i := 0; i < nWorkers; i++ {
@@ -96,13 +95,16 @@ func (h *PostOrder) LoopIteration() error {
 	// делаем запрос к системе расчета баллов
 	res, err := h.accrualSystem.GetOrderInfo(task.OrderID)
 	if err != nil {
-		// если заспамили - возвращаем задачу в работу и отдыхаем 5 секунд
-		if errors.Is(err, accrual.ErrTooManyRequests) {
+		// если заспамили - возвращаем задачу в работу и отдыхаем несколько секунд
+		// оказалось, что при 429 черный ящик возвращает заголовок Retry-After
+		// переписал так, чтобы его можно было использовать
+		var tmrErr *accrual.ErrTooManyRequests
+		if errors.As(err, &tmrErr) {
 			err = h.tracker.UpdateStatusAndRelease(h.ctx, task.StatusID, task.OrderID)
 			if err != nil {
 				return err
 			}
-			time.Sleep(h.accrualSystemTMRSleepInterval)
+			time.Sleep(tmrErr.RetryAfter)
 			return nil
 		}
 		return err

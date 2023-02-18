@@ -3,6 +3,7 @@ package accrual
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -22,8 +23,13 @@ func (s *AccrualService) GetOrderInfo(orderID string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if res.StatusCode() == http.StatusTooManyRequests {
-		return nil, ErrTooManyRequests
+		retryAfter, err := strconv.Atoi(res.Header().Get("Retry-After"))
+		if err != nil {
+			return nil, err
+		}
+		return nil, NewErrTooManyRequests(retryAfter)
 	}
 	return res.Body(), nil
 }

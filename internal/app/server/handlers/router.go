@@ -56,7 +56,6 @@ func NewRouter(db database.Service, cfg *config.Config, serverCtx context.Contex
 		serverCtx,
 		accrualService,
 		cfg.AccrualSystemPoolInterval,
-		cfg.AccrualSystemTMRSleepInterval,
 	)
 
 	rt.getOrder = &GetOrder{db: db}

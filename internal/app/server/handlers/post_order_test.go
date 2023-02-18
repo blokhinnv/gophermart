@@ -42,7 +42,6 @@ func (suite *PostOrderTestSuite) SetupSuite() {
 		context.Background(),
 		suite.accrualService,
 		1*time.Second,
-		5*time.Second,
 	)
 	handler := http.HandlerFunc(postOrder.Handler)
 	suite.setupAuth(handler)

@@ -14,11 +14,6 @@ import (
 )
 
 func RunServer(cfg *config.Config) {
-	db, err := database.NewDatabaseService(cfg, context.Background(), true)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	shutdownCtx, _ := signal.NotifyContext(
 		context.Background(),
 		syscall.SIGHUP,
@@ -26,7 +21,13 @@ func RunServer(cfg *config.Config) {
 		syscall.SIGTERM,
 		syscall.SIGQUIT,
 	)
-	r := handlers.NewRouter(db, cfg)
+
+	db, err := database.NewDatabaseService(cfg, shutdownCtx, cfg.RecreateDBOnStart)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	r := handlers.NewRouter(db, cfg, shutdownCtx)
 
 	go func() {
 		<-shutdownCtx.Done()

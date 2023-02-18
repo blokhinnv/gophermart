@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log"
 
 	"github.com/blokhinnv/gophermart/internal/app/accrual"
 	"github.com/blokhinnv/gophermart/internal/app/database"
@@ -13,28 +14,34 @@ import (
 
 type Router struct {
 	*chi.Mux
-	handlerContextCloseFuncs []context.CancelFunc
+	reg         *Register
+	login       *Login
+	postOrder   *PostOrder
+	getOrder    *GetOrder
+	balance     *Balance
+	withdraw    *Withdraw
+	withdrawals *Withdrawals
 }
 
 func (r *Router) Shutdown() {
-	for _, cancel := range r.handlerContextCloseFuncs {
-		cancel()
-	}
+	log.Println("Shutting down Router...")
+	// хочу убедиться, что все горутины этого хендлера завершились,
+	// прежде чем двигаться дальше
+	r.postOrder.WaitDone()
 }
 
-func NewRouter(db database.Service, cfg *config.Config) Router {
-	r := Router{
-		Mux:                      chi.NewRouter(),
-		handlerContextCloseFuncs: make([]context.CancelFunc, 0),
+func NewRouter(db database.Service, cfg *config.Config, serverCtx context.Context) Router {
+	rt := Router{
+		Mux: chi.NewRouter(),
 	}
-	reg := Register{
+	rt.reg = &Register{
 		LogReg: LogReg{
 			db:             db,
 			signingKey:     []byte(cfg.JWTSigningKey),
 			expireDuration: cfg.JWTExpireDuration,
 		},
 	}
-	login := Login{
+	rt.login = &Login{
 		LogReg: LogReg{
 			db:             db,
 			signingKey:     []byte(cfg.JWTSigningKey),
@@ -43,31 +50,38 @@ func NewRouter(db database.Service, cfg *config.Config) Router {
 	}
 	tokenAuth := jwtauth.New("HS256", []byte(cfg.JWTSigningKey), nil)
 	accrualService := accrual.NewAccrualService(cfg.AccrualSystemAddress)
-	postOrder, cancel := NewPostOrder(db, 2, accrualService)
-	r.handlerContextCloseFuncs = append(r.handlerContextCloseFuncs, cancel)
-	getOrder := GetOrder{db: db}
-	balance := Balance{db: db}
-	withdraw := Withdraw{db: db}
-	withdrawals := Withdrawals{db: db}
+	rt.postOrder = NewPostOrder(
+		db,
+		2,
+		serverCtx,
+		accrualService,
+		cfg.AccrualSystemPoolInterval,
+		cfg.AccrualSystemTMRSleepInterval,
+	)
 
-	r.Use(middleware.Logger)
-	r.Route("/api/user", func(r chi.Router) {
+	rt.getOrder = &GetOrder{db: db}
+	rt.balance = &Balance{db: db}
+	rt.withdraw = &Withdraw{db: db}
+	rt.withdrawals = &Withdrawals{db: db}
+
+	rt.Use(middleware.Logger)
+	rt.Route("/api/user", func(r chi.Router) {
 		// доступны без авторизации
 		r.Group(func(r chi.Router) {
-			r.Post("/register", reg.Handler)
-			r.Post("/login", login.Handler)
+			r.Post("/register", rt.reg.Handler)
+			r.Post("/login", rt.login.Handler)
 		})
 		// доступны с авторизацией
 		r.Group(func(r chi.Router) {
 			r.Use(jwtauth.Verifier(tokenAuth))
 			r.Use(jwtauth.Authenticator)
-			r.Post("/orders", postOrder.Handler)
-			r.Get("/orders", getOrder.Handler)
-			r.Get("/balance", balance.Handler)
-			r.Post("/balance/withdraw", withdraw.Handler)
-			r.Get("/withdrawals", withdrawals.Handler)
+			r.Post("/orders", rt.postOrder.Handler)
+			r.Get("/orders", rt.getOrder.Handler)
+			r.Get("/balance", rt.balance.Handler)
+			r.Post("/balance/withdraw", rt.withdraw.Handler)
+			r.Get("/withdrawals", rt.withdrawals.Handler)
 		})
 	})
 
-	return r
+	return rt
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/blokhinnv/gophermart/internal/app/accrual"
@@ -16,10 +17,13 @@ import (
 )
 
 type PostOrder struct {
-	db            database.Service
-	tracker       ordertracker.Tracker
-	accrualSystem accrual.Service
-	ctx           context.Context
+	db                            database.Service
+	tracker                       ordertracker.Tracker
+	accrualSystem                 accrual.Service
+	accrualSystemPoolInterval     time.Duration
+	accrualSystemTMRSleepInterval time.Duration
+	ctx                           context.Context
+	wg                            *sync.WaitGroup
 }
 
 type postOrderBody struct {
@@ -37,34 +41,39 @@ const postOrderContentType = "text/plain"
 func NewPostOrder(
 	db database.Service,
 	nWorkers int,
+	serverCtx context.Context,
 	accrualSystem accrual.Service,
-) (*PostOrder, context.CancelFunc) {
+	accrualSystemPoolInterval, accrualSystemTMRSleepInterval time.Duration,
+) *PostOrder {
+
 	o := PostOrder{
-		db:            db,
-		tracker:       db.Tracker(),
-		accrualSystem: accrualSystem,
+		db:                            db,
+		tracker:                       db.Tracker(),
+		accrualSystem:                 accrualSystem,
+		accrualSystemPoolInterval:     accrualSystemPoolInterval,
+		accrualSystemTMRSleepInterval: accrualSystemTMRSleepInterval,
+		wg:                            new(sync.WaitGroup),
 	}
-	handlerCtx, cancel := context.WithCancel(context.Background())
-	g, _ := errgroup.WithContext(handlerCtx)
+	g, _ := errgroup.WithContext(serverCtx)
 	for i := 0; i < nWorkers; i++ {
+		o.wg.Add(1)
 		g.Go(o.Loop)
 	}
-	cancelAndWait := func() {
-		cancel()
-		// заблокируемся до тех пор, пока все функции не поумирают?
-		g.Wait()
-	}
-	o.ctx = handlerCtx
-	return &o, cancelAndWait
+	// теперь это контекст из RunServer
+	// он отменяется по сигналу
+	o.ctx = serverCtx
+	return &o
 }
 
 func (h *PostOrder) Loop() error {
-	ticker := time.NewTicker(1000 * time.Millisecond)
+	ticker := time.NewTicker(h.accrualSystemPoolInterval)
 	for {
 		select {
+		// если контекст сервера завершен, то завершаем все горутины
 		case <-h.ctx.Done():
 			// это убьёт всю errgroup
 			log.Println("Shutting down Loop goroutine...")
+			h.wg.Done()
 			return ErrServerShutdown
 		case <-ticker.C:
 			err := h.LoopIteration()
@@ -93,7 +102,7 @@ func (h *PostOrder) LoopIteration() error {
 			if err != nil {
 				return err
 			}
-			time.Sleep(5 * time.Second)
+			time.Sleep(h.accrualSystemTMRSleepInterval)
 			return nil
 		}
 		return err
@@ -130,6 +139,10 @@ func (h *PostOrder) LoopIteration() error {
 		}
 	}
 	return nil
+}
+
+func (h *PostOrder) WaitDone() {
+	h.wg.Wait()
 }
 
 func (h *PostOrder) ReadBody(r *http.Request) (*postOrderBody, int, error) {

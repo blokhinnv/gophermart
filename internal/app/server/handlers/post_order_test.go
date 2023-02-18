@@ -3,12 +3,14 @@ package handlers
 // TODO: тесты для tracker + accrualSystem?
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/blokhinnv/gophermart/internal/app/accrual"
 	"github.com/blokhinnv/gophermart/internal/app/database"
@@ -34,7 +36,14 @@ func (suite *PostOrderTestSuite) SetupSuite() {
 		Tracker().
 		Return(suite.tracker)
 
-	postOrder, _ := NewPostOrder(suite.db, 2, suite.accrualService)
+	postOrder := NewPostOrder(
+		suite.db,
+		2,
+		context.Background(),
+		suite.accrualService,
+		1*time.Second,
+		5*time.Second,
+	)
 	handler := http.HandlerFunc(postOrder.Handler)
 	suite.setupAuth(handler)
 }

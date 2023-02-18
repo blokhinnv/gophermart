@@ -22,7 +22,7 @@ func RunServer(cfg *config.Config) {
 		syscall.SIGQUIT,
 	)
 
-	db, err := database.NewDatabaseService(cfg, shutdownCtx, cfg.RecreateDBOnStart)
+	db, err := database.NewDatabaseService(cfg, shutdownCtx)
 	if err != nil {
 		log.Fatal(err)
 	}

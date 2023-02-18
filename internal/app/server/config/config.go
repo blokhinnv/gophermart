@@ -13,7 +13,6 @@ type Config struct {
 	AccrualSystemAddress          string        `env:"ACCRUAL_SYSTEM_ADDRESS"`
 	JWTSigningKey                 string        `env:"JWT_SIGNING_KEY"                   envDefault:"practicum"`
 	JWTExpireDuration             time.Duration `env:"JWT_EXPIRE_DURATION"               envDefault:"1h"`
-	RecreateDBOnStart             bool          `env:"RECREATE_DB_ON_START"              envDefault:"true"`
 	AccrualSystemPoolInterval     time.Duration `env:"ACCRUAL_SYSTEM_POOL_INTERVAL"      envDefault:"1s"`
 	AccrualSystemTMRSleepInterval time.Duration `env:"ACCRUAL_SYSTEM_TMR_SLEEP_INTERVAL" envDefault:"5s"`
 }

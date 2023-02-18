@@ -32,7 +32,6 @@ type DatabaseService struct {
 func NewDatabaseService(
 	cfg *config.Config,
 	ctx context.Context,
-	recreateOnStart bool,
 ) (*DatabaseService, error) {
 	poolConfig, err := pgxpool.ParseConfig(cfg.DatabaseURI)
 	if err != nil {
@@ -42,12 +41,7 @@ func NewDatabaseService(
 	if err != nil {
 		return nil, err
 	}
-	if recreateOnStart {
-		log.Printf("Recreating tables in the DB...")
-		if _, err = conn.Exec(ctx, createSQL); err != nil {
-			return nil, err
-		}
-	}
+
 	return &DatabaseService{conn: conn}, nil
 }
 

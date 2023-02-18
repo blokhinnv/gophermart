@@ -17,13 +17,12 @@ import (
 )
 
 type PostOrder struct {
-	db                            database.Service
-	tracker                       ordertracker.Tracker
-	accrualSystem                 accrual.Service
-	accrualSystemPoolInterval     time.Duration
-	accrualSystemTMRSleepInterval time.Duration
-	ctx                           context.Context
-	wg                            *sync.WaitGroup
+	db                        database.Service
+	tracker                   ordertracker.Tracker
+	accrualSystem             accrual.Service
+	accrualSystemPoolInterval time.Duration
+	ctx                       context.Context
+	wg                        *sync.WaitGroup
 }
 
 type postOrderBody struct {

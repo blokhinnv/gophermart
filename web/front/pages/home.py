@@ -17,6 +17,10 @@ layout = html.Div(
                                 [
                                     html.Div(
                                         [
+                                            html.Img(
+                                                src="/assets/gopher.png",
+                                                style={"max-width": 30, "margin-right": 10},
+                                            ),
                                             html.H2(
                                                 "User",
                                                 style={"margin-right": 10},
@@ -27,7 +31,7 @@ layout = html.Div(
                                                     html.P(
                                                         [
                                                             html.Span(
-                                                                "250",
+                                                                "",
                                                                 className="font-weight-bold",
                                                                 id="points",
                                                             ),
@@ -43,13 +47,13 @@ layout = html.Div(
                                         className="d-flex align-items-center",
                                     )
                                 ]
-                            )
+                            ),
+                            className="mb-3"
                         ),
                         dbc.Row(
                             [
                                 dbc.Col(
                                     [
-                                        dbc.Label(html_for="order_id"),
                                         dbc.Input(
                                             type="input",
                                             id="order_id",
@@ -105,6 +109,7 @@ layout = html.Div(
                                             color="primary",
                                             className="me-1 mt-2",
                                             id="update_orders",
+                                            style={"margin-top": 10, "float": "right"}
                                         ),
                                     ]
                                 ),

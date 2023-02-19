@@ -61,4 +61,8 @@ if __name__ == "__main__":
     api = GophermartAPI(os.getenv("GOPHERMART_API_ADDR"))
     app.api = api
     app.USERS = {}
-    app.run_server(debug=True, port="7777")
+    app.run_server(
+        debug=True,
+        host=os.getenv("FLASK_RUN_HOST", "0.0.0.0"),
+        port=os.getenv("FLASK_RUN_PORT", "80"),
+    )

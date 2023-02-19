@@ -1,0 +1,83 @@
+version: "3.3"
+# networks:
+#   db_network:
+#     name: my-shared-db-network
+services:
+  postgres:
+    image: postgres
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=pwd
+      - POSTGRES_DB=root
+    # networks:
+    #   - db_network
+    ports:
+      - "5432"
+    healthcheck:
+      test: pg_isready -U root -d root
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: migrate/migrate
+    restart: on-failure
+    volumes:
+      - ./internal/app/database/migration:/migrations
+    command: ["-path", "/migrations", "-database",  "postgres://root:pwd@postgres:5432/root?sslmode=disable", "up"]
+    links:
+      - postgres
+    depends_on:
+      - postgres
+    # networks:
+    #   - db_network
+
+  accrual:
+    build:
+      context: "./"
+      dockerfile: "./build/accrual/Dockerfile"
+    ports:
+      - '8081:8080'
+    # networks:
+    #   - db_network
+
+  bbhelper:
+    build:
+      context: "./"
+      dockerfile: "./build/bbhelper/Dockerfile"
+    depends_on:
+      - accrual
+    # networks:
+    #   - db_network
+
+  gophermart:
+    build:
+      context: "./"
+      dockerfile: "./build/gophermart/Dockerfile"
+    ports:
+      - '8080:8080'
+    env_file:
+      - "./cmd/gophermart/.docker.env"
+    depends_on:
+      - migrate
+    # networks:
+    #   - db_network
+
+  front:
+    build:
+      context: "./"
+      dockerfile: "./build/web/Dockerfile"
+    ports:
+      - '7777:80'
+    env_file:
+      - "./web/front/.docker.env"
+    volumes:
+      - "./web/front:/app/front"
+    depends_on:
+      - gophermart
+    # networks:
+    #   - db_network
+
+
+# https://stackoverflow.com/questions/55779979/how-to-run-golang-migrate-with-docker-compose
+# https://stackoverflow.com/questions/31746182/docker-compose-wait-for-container-x-before-starting-y

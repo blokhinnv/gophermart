@@ -6,14 +6,18 @@ from dash_extensions.enrich import (
     TriggerTransform,
 )
 from flask_login import LoginManager
+from flask import Flask
+
+server = Flask(__name__)
 
 app = DashProxy(
     __name__,
+    server=server,
     external_stylesheets=[dbc.themes.BOOTSTRAP],
     transforms=[TriggerTransform(), NoOutputTransform(), MultiplexerTransform()],
     suppress_callback_exceptions=True,
 )
-server = app.server
+
 login_manager = LoginManager()
 login_manager.init_app(server)
 login_manager.login_view = "/login"

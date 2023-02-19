@@ -76,6 +76,7 @@ func (h *PostOrder) Loop() error {
 		case <-ticker.C:
 			err := h.LoopIteration()
 			if err != nil {
+				log.Printf("Error while LoopIteration: %v", err)
 				return err
 			}
 		}

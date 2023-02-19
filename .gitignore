@@ -22,7 +22,7 @@ vendor/
 .idea
 .vscode
 *.log
-*.env
+.env
 env
 *.pyc
 __pycache__

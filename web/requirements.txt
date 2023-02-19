@@ -1,0 +1,10 @@
+dash
+dash-bootstrap-components
+dash-extensions
+loguru
+flask
+flask-sqlalchemy
+flask-login
+requests
+dash-loading-spinners
+python-dotenv

@@ -23,3 +23,12 @@ git fetch template && git checkout template/master .github
 ```
 
 Затем добавьте полученные изменения в свой репозиторий.
+
+.env
+```
+RUN_ADDRESS="..."
+DATABASE_URI="..."
+ACCRUAL_SYSTEM_ADDRESS="..."
+JWT_SIGNING_KEY="..."
+JWT_EXPIRE_DURATION="..."
+```

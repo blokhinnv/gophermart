@@ -44,9 +44,22 @@ jobs:
           mv $GITHUB_WORKSPACE/.tools/gophermarttest /usr/local/bin/gophermarttest
           mv $GITHUB_WORKSPACE/.tools/random /usr/local/bin/random
 
+      - name: Setup migrate
+        run: |
+          curl -L https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz -o "migrate.tar.gz"
+          tar -xvf migrate.tar.gz migrate
+          chmod +x migrate
+
+
+      - name: Run migrate
+        run: |
+          ls
+          ./migrate -path internal/app/database/migration -database "postgresql://postgres:postgres@postgres/praktikum?sslmode=disable" -verbose up
+
+
       - name: Prepare binaries
         run: |
-          (cd cmd/gophermart && go build -o gophermart)
+          (cd cmd/gophermart && go build -buildvcs=false -o gophermart)
           (cd cmd/accrual && chmod +x accrual_linux_amd64)
 
       - name: Test
